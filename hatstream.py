@@ -3,12 +3,14 @@ from prompt_toolkit import prompt
 from datetime import datetime
 import urllib.parse
 import aes as AES
+import mimetypes
 import requests
 import socketio
 import tabulate
 import logging
 import getpass
 import random
+import base64
 import json
 import os
 
@@ -124,12 +126,32 @@ def handle_chat(user_id):
                 message = prompt(f"< YOU [{current_time()}] ")
                 if not message:
                     continue
-                    
+                
+                message_type = "text"
+                file_type = None
+
+                if message.startswith(":u "):
+                    message_type = "binary"
+                    file_path = message.split(":u ", 1)[1].strip()
+
+                    if not os.path.exists(file_path):
+                        logging.error("File not found: %s", file_path)
+                        continue
+
+                    with open(file_path, "rb") as f:
+                        file_data = f.read()
+
+                    base64_encoded = base64.b64encode(file_data).decode('utf-8')
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    file_type = mime_type or  "application/octet-stream"
+                    message = f"data:{mime_type};base64,{base64_encoded}"
+
                 send_secure_request({
                     "action": "MESSAGE_TO_REMOTE",
-                    "type": "text",
+                    "type": message_type,
                     "time": current_time(),
                     "data": message,
+                    "ftype": file_type, 
                     "userAddress": STATE['currentUser'],
                     "thisUserAddress": URL
                 })
