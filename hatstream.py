@@ -190,7 +190,7 @@ def main():
                     logging.error("Same server URL.")
                     continue
 
-                if url:
+                if not url:
                     logging.error("Invalid URL.")
                     continue
                 
@@ -210,7 +210,7 @@ def main():
                     logging.error("Same server URL.")
                     continue
 
-                if url:
+                if not url:
                     logging.error("Invalid URL.")
                     continue
 
