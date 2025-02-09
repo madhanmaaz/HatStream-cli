@@ -4,6 +4,8 @@
 > [!IMPORTANT]
 > - Host HatStream server https://github.com/madhanmaaz/HatStream
 
+https://github.com/user-attachments/assets/e66499ec-28f6-4a1a-8b02-fed2bda0773e
+
 ### Installation
 ```bash
 git clone https://github.com/madhanmaaz/HatStream-cli
