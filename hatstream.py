@@ -117,16 +117,13 @@ def handle_chat(user_id):
     try:
         user_address = STATE["users"][int(user_id)]
         STATE["currentUser"] = user_address
-        parsed_url = urllib.parse.urlparse(user_address)
-
+        logging.info(f"Connecting to ({user_address})...")
+        
         while True:
             try:
-                prompt_text = f"[{current_time()}] [/{parsed_url.netloc}]> "
-                message = prompt(prompt_text, refresh_interval=0.1)
+                message = prompt(f"< YOU [{current_time()}] ")
                 if not message:
                     continue
-                print("\033[F\033[K", end="")
-                print(f"< YOU [{current_time()}] {message}")
                     
                 send_secure_request({
                     "action": "MESSAGE_TO_REMOTE",
