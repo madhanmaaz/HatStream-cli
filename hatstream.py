@@ -181,7 +181,8 @@ def handle_chat(user_id):
                     "thisUserAddress": URL
                 })
             except KeyboardInterrupt:
-                logging.info(f"{STATE['currentUser']} Exiting chat...")
+                logging.info(f"Exiting chat ({STATE['currentUser']})...")
+                STATE['currentUser'] = None
                 break
     except (IndexError, ValueError):
         logging.error("Invalid user ID.")
