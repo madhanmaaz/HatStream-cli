@@ -44,6 +44,9 @@ STATE = {
 
 # Socket.IO client
 SIO = socketio.Client()
+DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
+if not os.path.exists(DOWNLOADS_DIR):
+    DOWNLOADS_DIR = "/"
 
 def current_time():
     return datetime.now().strftime("%H:%M:%S")
@@ -72,7 +75,8 @@ def print_help():
 
 @SIO.on("connect")
 def on_connect():
-    logging.info("Socket connected...")
+    with patch_stdout():
+        logging.info("Socket connected...")
 
 @SIO.on("disconnect")
 def on_disconnect():
@@ -84,16 +88,36 @@ def on_message(response):
     """Handle incoming messages."""
     try:
         if "error" in response:
-            logging.error(response["error"])
-            return
-        message_obj = AES.decrypt(response["data"], STATE["PHRASE_1"])
-        if message_obj["type"] != "text":
+            with patch_stdout():
+                logging.error(response["error"])
             return
         
+        message_obj = AES.decrypt(response["data"], STATE["PHRASE_1"])
+        if STATE["currentUser"] != message_obj['userAddress']:
+            with patch_stdout():
+                logging.info(f"Msg from: {message_obj['userAddress']}")
+            return
+        
+        if message_obj["type"] == "text":
+            with patch_stdout():
+                print(f"> RMT [{current_time()}] {message_obj['data']}")
+            return
+        
+        file_path = os.path.join(DOWNLOADS_DIR, message_obj['filename'] + ".hs")
+        index = 0
+        while os.path.exists(file_path):
+            index += 1
+            file_path = os.path.join(DOWNLOADS_DIR, f"{message_obj['filename']}.{index}.hs")
+        
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(message_obj['data']))
+
         with patch_stdout():
-            print(f"> RMT [{current_time()}] {message_obj['data']}")
+            logging.info(f"File saved successfully: {file_path}")
+
     except Exception as e:
-        logging.error(f"Failed to process message: {e}")
+        with patch_stdout():
+            logging.error(f"Failed to process message: {e}")
 
 def validate_url(url):
     """Validate a URL."""
@@ -123,13 +147,13 @@ def handle_chat(user_id):
         
         while True:
             try:
-                message = prompt(f"< YOU [{current_time()}] ")
+                message = prompt(f"< YOU [{current_time()}] ").strip()
                 if not message:
                     continue
                 
                 message_type = "text"
                 file_type = None
-
+                filename = None
                 if message.startswith(":u "):
                     message_type = "binary"
                     file_path = message.split(":u ", 1)[1].strip()
@@ -141,6 +165,7 @@ def handle_chat(user_id):
                     with open(file_path, "rb") as f:
                         file_data = f.read()
 
+                    filename = os.path.basename(file_path)
                     base64_encoded = base64.b64encode(file_data).decode('utf-8')
                     mime_type, _ = mimetypes.guess_type(file_path)
                     file_type = mime_type or  "application/octet-stream"
@@ -152,6 +177,7 @@ def handle_chat(user_id):
                     "time": current_time(),
                     "data": message,
                     "ftype": file_type, 
+                    "filename": filename,
                     "userAddress": STATE['currentUser'],
                     "thisUserAddress": URL
                 })
@@ -198,7 +224,7 @@ def main():
     # Main loop
     while True:
         try:
-            user_input = input(f"[{current_time()}] [/]> ").strip().lower()
+            user_input = prompt(f"[{current_time()}] [/]> ").strip().lower()
             if user_input in ["exit", "quit"]:
                 logging.info("Exiting...")
                 break
