@@ -1,13 +1,13 @@
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit import prompt
 from datetime import datetime
+from logger import logging
 import urllib.parse
 import aes as AES
 import mimetypes
 import requests
 import socketio
 import tabulate
-import logging
 import getpass
 import random
 import base64
@@ -27,12 +27,6 @@ COMMANDS = {
     "help": "Show this help menu",
     "exit": "Exit the program"
 }
-
-logging.basicConfig(
-    format='[%(asctime)s] %(levelname)s %(message)s', 
-    datefmt='%H:%M:%S', 
-    level=logging.INFO
-)
 
 # Global state
 STATE = {
@@ -83,40 +77,46 @@ def on_disconnect():
     with patch_stdout():
         logging.info("Socket disconnected...")
 
-@SIO.on("data")
-def on_message(response):
-    """Handle incoming messages."""
-    try:
-        if "error" in response:
-            with patch_stdout():
-                logging.error(response["error"])
+def handleSocketActions(options):
+    action = options['action']
+    userAddress = options['userAddress']
+
+    if action == "MESSAGE":
+        if STATE["currentUser"] != userAddress:
+            logging.info(f"Msg from: {userAddress}")
             return
         
-        message_obj = AES.decrypt(response["data"], STATE["PHRASE_1"])
-        if STATE["currentUser"] != message_obj['userAddress']:
-            with patch_stdout():
-                logging.info(f"Msg from: {message_obj['userAddress']}")
+        if options["type"] == "text":
+            print(f"> RMT [{current_time()}] {options['data']}")
             return
-        
-        if message_obj["type"] == "text":
-            with patch_stdout():
-                print(f"> RMT [{current_time()}] {message_obj['data']}")
-            return
-        
-        file_path = os.path.join(DOWNLOADS_DIR, message_obj['filename'] + ".hs")
+
+        file_path = os.path.join(DOWNLOADS_DIR, options['filename'] + ".hs")
         index = 0
         while os.path.exists(file_path):
             index += 1
-            file_path = os.path.join(DOWNLOADS_DIR, f"{message_obj['filename']}.{index}.hs")
+            file_path = os.path.join(DOWNLOADS_DIR, f"{options['filename']}.{index}.hs")
         
         with open(file_path, "wb") as f:
-            f.write(base64.b64decode(message_obj['data']))
+            f.write(base64.b64decode(options['data']))
 
-        with patch_stdout():
-            logging.info(f"File saved successfully: {file_path}")
+        logging.info(f"File saved successfully: {file_path}")
 
-    except Exception as e:
-        with patch_stdout():
+    elif action == "ADD_USER":
+        STATE["users"].append(userAddress)
+        logging.info(f"New user added: {userAddress}")
+
+@SIO.on("data")
+def on_message(response):
+    """Handle incoming messages."""
+    with patch_stdout():
+        try:
+            if "error" in response:
+                logging.error(response["error"])
+                return
+            
+            data = AES.decrypt(response["data"], STATE["PHRASE_1"])
+            handleSocketActions(data)
+        except Exception as e:
             logging.error(f"Failed to process message: {e}")
 
 def validate_url(url):
@@ -166,10 +166,9 @@ def handle_chat(user_id):
                         file_data = f.read()
 
                     filename = os.path.basename(file_path)
-                    base64_encoded = base64.b64encode(file_data).decode('utf-8')
+                    message = base64.b64encode(file_data).decode('utf-8')
                     mime_type, _ = mimetypes.guess_type(file_path)
-                    file_type = mime_type or  "application/octet-stream"
-                    message = f"data:{mime_type};base64,{base64_encoded}"
+                    file_type = mime_type or "application/octet-stream"
 
                 send_secure_request({
                     "action": "MESSAGE_TO_REMOTE",
