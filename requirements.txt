@@ -3,3 +3,4 @@ websocket-client==1.7.0
 requests
 cryptography
 tabulate
+prompt_toolkit
