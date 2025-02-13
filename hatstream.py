@@ -40,7 +40,7 @@ STATE = {
 SIO = socketio.Client()
 DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 if not os.path.exists(DOWNLOADS_DIR):
-    DOWNLOADS_DIR = "/"
+    os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 def current_time():
     return datetime.now().strftime("%H:%M:%S")
